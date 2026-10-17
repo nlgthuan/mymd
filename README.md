@@ -44,4 +44,12 @@ alignment, thematic breaks, links (web, relative `.md` files, `#heading` anchors
 local and remote images (incl. SVG), footnotes, YAML front matter, and the common
 README HTML subset (`<img width>`, `<p align=center>`, `<br>`, `<b>`, `<a>`, `<sup>`, `<details>`…).
 
-Not supported: syntax highlighting, math, mermaid.
+**Code**: fenced blocks are syntax-highlighted for ~40 languages (C family,
+Swift, Rust, Go, Python, JS/TS, shell, SQL, YAML, …) plus `diff` and HTML/XML.
+
+**Math**: `$inline$`, `\(inline\)`, `$$display$$`, `\[display\]` and ```` ```math ````
+blocks, typeset natively with [SwiftMath](https://github.com/mgriebling/SwiftMath)
+(vendored in `Vendor/`, Latin Modern font). Dollar amounts like `$5` stay text;
+invalid TeX is shown as red source.
+
+Not supported: mermaid.

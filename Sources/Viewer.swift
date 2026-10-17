@@ -7,6 +7,11 @@ final class MDTextView: NSTextView {
         if e.modifierFlags.contains(.command) { return super.keyDown(with: e) }
         viewer?.handleKey(e)
     }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        viewer?.appearanceChanged()
+    }
 }
 
 /// Lays out the scroll view above a one-line bar (status / input), zathura style.
@@ -197,7 +202,8 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
 
     private func render(_ src: String, keepY: CGFloat?) {
         let t0 = CFAbsoluteTimeGetCurrent()
-        let r = Renderer(base: url.deletingLastPathComponent(), size: 15 * zoom)
+        let dark = text.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let r = Renderer(base: url.deletingLastPathComponent(), size: 15 * zoom, dark: dark)
         let s = r.render(src)
         let t1 = CFAbsoluteTimeGetCurrent()
         text.textStorage?.setAttributedString(s)
@@ -217,6 +223,12 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
             setY(0)
         }
         updateStatus()
+    }
+
+    /// Math is rasterised in the current text colour, so re-render on theme change.
+    func appearanceChanged() {
+        guard let src = lastSource, src.contains("$") || src.contains("\\(") || src.contains("```math") else { return }
+        render(src, keepY: scroll.contentView.bounds.minY)
     }
 
     func reload() {

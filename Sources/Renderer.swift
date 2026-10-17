@@ -1,4 +1,5 @@
 import AppKit
+import SwiftMath
 
 // Markdown -> NSAttributedString, using Foundation's (cmark-gfm based) parser and
 // TextKit 1 text blocks/tables for block-level layout.
@@ -74,9 +75,13 @@ final class Renderer {
         var centeredBlock = false
     }
 
-    init(base: URL, size: CGFloat) {
+    private var maths: [(tex: String, display: Bool)] = []
+    private let dark: Bool
+
+    init(base: URL, size: CGFloat, dark: Bool = false) {
         self.base = base
         self.size = size
+        self.dark = dark
     }
 
     // MARK: fonts
@@ -132,7 +137,7 @@ final class Renderer {
             } else if let img = run.imageURL {
                 buf.append(image(img.absoluteString, alt: text, width: nil, font: font, link: run.link))
             } else {
-                buf.append(styled(text, font: font, ipi: ipi, link: run.link))
+                appendText(text, to: buf, font: font, ipi: ipi, link: run.link)
             }
         }
         if curID != nil { flush(curIntent, buf) }
@@ -382,8 +387,10 @@ final class Renderer {
             }
         }
         let indent = CGFloat(innerLists) * step
-        var isCode = false
-        if case .codeBlock? = kind { isCode = true }
+        var isCode = false, isMath = false
+        if case .codeBlock(let l)? = kind {
+            if l?.lowercased() == "math" { isMath = true } else { isCode = true }
+        }
         let centered = h.centeredBlock || !h.centerStack.isEmpty
         h.centeredBlock = false
 
@@ -447,6 +454,15 @@ final class Renderer {
             if level == 6 {
                 body.addAttribute(.foregroundColor, value: Palette.muted, range: NSRange(location: 0, length: body.length))
             }
+        case .codeBlock? where isMath:
+            var tex = body.string
+            if tex.hasSuffix("\n") { tex.removeLast() }
+            body = NSMutableAttributedString(attributedString: math(tex, display: true))
+            ps.alignment = .center
+            ps.lineHeightMultiple = 1
+            ps.paragraphSpacingBefore = size * 0.2
+            ps.paragraphSpacing = size
+            align = true
         case .codeBlock(let lang)?:
             var code = body.string
             if code.hasSuffix("\n") { code.removeLast() }
@@ -570,6 +586,177 @@ final class Renderer {
         prevInList = false
     }
 
+    // MARK: math
+
+    private static let placeholderRe = try! NSRegularExpression(pattern: "\u{E000}(\\d+)\u{E001}")
+    private static var mathCache: [String: RenderedMath] = [:]
+
+    /// Appends a text run, expanding math placeholders left by `extractMath`.
+    private func appendText(_ text: String, to buf: NSMutableAttributedString, font: NSFont,
+                            ipi: InlinePresentationIntent, link: URL?) {
+        guard text.contains("\u{E000}") else { return buf.append(styled(text, font: font, ipi: ipi, link: link)) }
+        let ns = text as NSString
+        var pos = 0
+        for m in Self.placeholderRe.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            if m.range.location > pos {
+                buf.append(styled(ns.substring(with: NSRange(location: pos, length: m.range.location - pos)), font: font, ipi: ipi, link: link))
+            }
+            if let i = Int(ns.substring(with: m.range(at: 1))), i < maths.count {
+                let a = NSMutableAttributedString(attributedString: math(maths[i].tex, display: maths[i].display))
+                if let l = link ?? h.link { a.addAttribute(.link, value: l, range: NSRange(location: 0, length: a.length)) }
+                buf.append(a)
+            }
+            pos = NSMaxRange(m.range)
+        }
+        if pos < ns.length { buf.append(styled(ns.substring(from: pos), font: font, ipi: ipi, link: link)) }
+    }
+
+    private func math(_ tex: String, display: Bool) -> NSAttributedString {
+        let pt = size * (display ? 1.2 : 1.1)
+        let key = "\(display)|\(dark)|\(pt)|\(tex)"
+        var rendered = Self.mathCache[key]
+        var failure: String?
+        if rendered == nil {
+            let color = dark ? Palette.rgb(218, 218, 214) : Palette.rgb(36, 36, 38)
+            switch MathRenderer.render(tex, size: pt, color: color, display: display) {
+            case .success(let r): rendered = r; Self.mathCache[key] = r
+            case .failure(let e): failure = e.localizedDescription
+            }
+        }
+        guard let r = rendered else {
+            let src = display ? tex : "$\(tex)$"
+            let s = NSMutableAttributedString(attributedString: styled(src, font: mono(size * 0.86), color: Palette.error))
+            s.addAttribute(.toolTip, value: failure ?? "invalid math", range: NSRange(location: 0, length: s.length))
+            return s
+        }
+        let att = NSTextAttachment()
+        att.image = r.image
+        att.bounds = CGRect(x: 0, y: -r.descent, width: r.image.size.width, height: r.image.size.height)
+        let s = NSMutableAttributedString(attachment: att)
+        s.addAttributes([.font: body, .toolTip: tex], range: NSRange(location: 0, length: s.length))
+        return s
+    }
+
+    /// Pulls TeX out of the markdown before cmark sees it (it would otherwise eat
+    /// `_`, `*` and `\`). `$$…$$` / `\[…\]` on their own lines become ```math
+    /// blocks; inline `$…$` / `\(…\)` become placeholders. Code is left alone.
+    private func extractMath(_ s: String) -> String {
+        guard s.contains("$") || s.contains("\\(") || s.contains("\\[") else { return s }
+        let lines = s.components(separatedBy: "\n")
+        var out: [String] = []
+        var fence: (Character, Int)?
+        var i = 0
+        outer: while i < lines.count {
+            let line = lines[i]
+            let trimmed = line.drop { $0 == " " || $0 == "\t" }
+            let indent = String(line.prefix(line.count - trimmed.count))
+            if let f = fence {
+                if trimmed.prefix(while: { $0 == f.0 }).count >= f.1, trimmed.allSatisfy({ $0 == f.0 || $0 == " " }) { fence = nil }
+                out.append(line); i += 1; continue
+            }
+            if let c = trimmed.first, c == "`" || c == "~" {
+                let run = trimmed.prefix { $0 == c }.count
+                if run >= 3 { fence = (c, run); out.append(line); i += 1; continue }
+            }
+            for (open, close) in [("$$", "$$"), ("\\[", "\\]")] where trimmed.hasPrefix(open) {
+                var rest = String(trimmed.dropFirst(open.count))
+                var body: [String] = []
+                var j = i
+                while true {
+                    if let r = rest.range(of: close) {
+                        if !rest[r.upperBound...].trimmingCharacters(in: .whitespaces).isEmpty { break }
+                        body.append(String(rest[..<r.lowerBound]))
+                        let tex = body.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                        if tex.isEmpty { break }
+                        out.append(indent + "```math")
+                        out.append(contentsOf: tex.components(separatedBy: "\n").map { indent + $0 })
+                        out.append(indent + "```")
+                        i = j + 1
+                        continue outer
+                    }
+                    body.append(rest)
+                    j += 1
+                    // Display math never spans a blank line; stop rather than swallow the doc.
+                    if j >= lines.count || lines[j].trimmingCharacters(in: .whitespaces).isEmpty { break }
+                    rest = String(lines[j].drop { $0 == " " || $0 == "\t" })
+                }
+            }
+            out.append(inlineMath(line))
+            i += 1
+        }
+        return out.joined(separator: "\n")
+    }
+
+    private func placeholder(_ tex: String, display: Bool) -> String {
+        maths.append((tex, display))
+        return "\u{E000}\(maths.count - 1)\u{E001}"
+    }
+
+    private func inlineMath(_ line: String) -> String {
+        guard line.contains("$") || line.contains("\\(") else { return line }
+        let c = Array(line)
+        let n = c.count
+        var res = ""
+        var k = 0
+        scan: while k < n {
+            let ch = c[k]
+            if ch == "\\" && k + 1 < n {
+                if c[k + 1] == "(" {
+                    var m = k + 2
+                    while m + 1 < n && !(c[m] == "\\" && c[m + 1] == ")") { m += 1 }
+                    if m + 1 < n, m > k + 2 {
+                        res += placeholder(String(c[(k + 2)..<m]), display: false)
+                        k = m + 2
+                        continue
+                    }
+                }
+                res.append(ch); res.append(c[k + 1]); k += 2
+                continue
+            }
+            if ch == "`" {
+                let run = c[k...].prefix { $0 == "`" }.count
+                var m = k + run
+                while m < n {
+                    if c[m] == "`" {
+                        let r2 = c[m...].prefix { $0 == "`" }.count
+                        if r2 == run { m += r2; res += String(c[k..<m]); k = m; continue scan }
+                        m += r2
+                    } else { m += 1 }
+                }
+                res += String(c[k..<(k + run)]); k += run
+                continue
+            }
+            if ch == "$" {
+                let dbl = k + 1 < n && c[k + 1] == "$"
+                let start = k + (dbl ? 2 : 1)
+                if start < n && !c[start].isWhitespace {
+                    var m = start
+                    while m < n && c[m] != "`" {    // math never spans into code
+                        if c[m] == "\\" { m += 2; continue }
+                        if c[m] == "$" && m > start {
+                            if dbl {
+                                if m + 1 < n && c[m + 1] == "$" {
+                                    res += placeholder(String(c[start..<m]), display: true)
+                                    k = m + 2
+                                    continue scan
+                                }
+                            } else if !c[m - 1].isWhitespace && !(m + 1 < n && c[m + 1].isNumber) {
+                                res += placeholder(String(c[start..<m]), display: false)
+                                k = m + 1
+                                continue scan
+                            }
+                        }
+                        m += 1
+                    }
+                }
+                if dbl { res += "$$"; k += 2; continue }
+            }
+            res.append(ch)
+            k += 1
+        }
+        return res
+    }
+
     // MARK: preprocessing (front matter, footnotes)
 
     private func preprocess(_ s: String) -> String {
@@ -580,6 +767,7 @@ final class Renderer {
                 t = "```yaml\n" + t[start..<end.lowerBound] + "\n```\n" + t[end.upperBound...]
             }
         }
+        t = extractMath(t)
         guard t.contains("[^") else { return t }
         let defRe = try! NSRegularExpression(pattern: "^\\[\\^([^\\]\\s]+)\\]:[ \\t]*(.*)$", options: .anchorsMatchLines)
         let ns = t as NSString
