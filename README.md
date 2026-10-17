@@ -15,6 +15,7 @@ library (SwiftMath, for TeX).
     make install    # app -> /Applications, `mymd` command -> ~/.local/bin
                     # (override with PREFIX=... BINDIR=...)
     make screenshots  # regenerate docs/screenshots from docs/showcase.md
+    make uninstall    # remove app + command (PURGE=1 also removes settings)
 
 Then from a terminal:
 

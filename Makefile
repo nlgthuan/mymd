@@ -38,10 +38,22 @@ install: $(APP)
 	@mkdir -p $(BINDIR)
 	install -m 755 bin/mymd $(BINDIR)/mymd
 
+# Removes the app and the CLI. `make uninstall PURGE=1` also deletes settings,
+# caches and saved window state.
+uninstall:
+	-@pkill -x mymd 2>/dev/null || true
+	rm -rf $(PREFIX)/mymd.app
+	rm -f $(BINDIR)/mymd
+ifdef PURGE
+	-defaults delete com.thuanngo.mymd 2>/dev/null
+	rm -rf $(HOME)/Library/Caches/com.thuanngo.mymd
+	rm -rf "$(HOME)/Library/Saved Application State/com.thuanngo.mymd.savedState"
+endif
+
 clean:
 	rm -rf build
 
-.PHONY: all install clean
+.PHONY: all install uninstall clean
 
 # README screenshots: render docs/showcase.md in both themes and frame them.
 SHOT_SIZE := 820x660
