@@ -21,6 +21,13 @@ enum Palette {
     static let error = dyn(rgb(190, 40, 40), rgb(255, 110, 100))
 }
 
+/// TextKit merges adjacent paragraphs whose text blocks compare equal, so two
+/// consecutive code blocks (or quotes) would render as one. Compare by identity.
+final class Block: NSTextBlock {
+    override func isEqual(_ object: Any?) -> Bool { (object as AnyObject?) === self }
+    override var hash: Int { ObjectIdentifier(self).hashValue }
+}
+
 final class ImageRef {
     var attachment: NSTextAttachment
     let url: URL
@@ -305,7 +312,7 @@ final class Renderer {
 
     private func quoteBlock(_ id: Int, margin: CGFloat) -> NSTextBlock {
         if let b = quoteBlocks[id] { return b }
-        let b = NSTextBlock()
+        let b = Block()
         b.setContentWidth(100, type: .percentageValueType)
         b.setWidth(3, type: .absoluteValueType, for: .border, edge: .minX)
         b.setBorderColor(Palette.rule, for: .minX)
@@ -427,7 +434,7 @@ final class Renderer {
             ps.paragraphSpacingBefore = out.length == 0 ? 0 : size * (level <= 2 ? 1.3 : 0.9)
             ps.paragraphSpacing = size * (level <= 2 ? 0.7 : 0.45)
             if level <= 2 {
-                let b = NSTextBlock()
+                let b = Block()
         b.setContentWidth(100, type: .percentageValueType)
                 b.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
                 b.setBorderColor(Palette.rule, for: .maxY)
@@ -440,16 +447,17 @@ final class Renderer {
             if level == 6 {
                 body.addAttribute(.foregroundColor, value: Palette.muted, range: NSRange(location: 0, length: body.length))
             }
-        case .codeBlock?:
-            if body.string.hasSuffix("\n") { body.deleteCharacters(in: NSRange(location: body.length - 1, length: 1)) }
-            let b = NSTextBlock()
+        case .codeBlock(let lang)?:
+            var code = body.string
+            if code.hasSuffix("\n") { code.removeLast() }
+            body = Highlighter.highlight(code, lang: lang, font: mono(size * 0.86))
+            let b = Block()
         b.setContentWidth(100, type: .percentageValueType)
             b.backgroundColor = Palette.codeBg
             b.setWidth(size * 0.8, type: .absoluteValueType, for: .padding, edge: .minY)
             b.setWidth(size * 0.8, type: .absoluteValueType, for: .padding, edge: .maxY)
             b.setWidth(size, type: .absoluteValueType, for: .padding, edge: .minX)
             b.setWidth(size, type: .absoluteValueType, for: .padding, edge: .maxX)
-            b.setWidth(size * 0.8, type: .absoluteValueType, for: .margin, edge: .maxY)
             if indent > 0 { b.setWidth(indent, type: .absoluteValueType, for: .margin, edge: .minX) }
             blocks.append(b)
             ps.lineHeightMultiple = 1.15
@@ -460,7 +468,7 @@ final class Renderer {
             if body.length == 0 { body = NSMutableAttributedString(string: " ", attributes: [.font: mono(size * 0.86)]) }
         case .thematicBreak?:
             body = NSMutableAttributedString(string: "\u{00A0}", attributes: [.font: NSFont.systemFont(ofSize: 2)])
-            let b = NSTextBlock()
+            let b = Block()
         b.setContentWidth(100, type: .percentageValueType)
             b.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
             b.setBorderColor(Palette.rule, for: .maxY)
@@ -511,6 +519,17 @@ final class Renderer {
         p.append(NSAttributedString(string: "\n", attributes: [.font: endFont]))
         p.addAttribute(.paragraphStyle, value: ps, range: NSRange(location: 0, length: p.length))
         out.append(p)
+        if isCode { spacer(quotes) }
+    }
+
+    /// An empty paragraph outside the block. TextKit 1 paints a block's background
+    /// over its margins, so consecutive code blocks need real text between them.
+    private func spacer(_ blocks: [NSTextBlock]) {
+        let ps = NSMutableParagraphStyle()
+        ps.textBlocks = blocks
+        ps.minimumLineHeight = size * 0.8
+        ps.maximumLineHeight = size * 0.8
+        out.append(NSAttributedString(string: "\n", attributes: [.font: NSFont.systemFont(ofSize: 1), .paragraphStyle: ps]))
     }
 
     private func emitCell(_ content: NSMutableAttributedString, _ col: Int) {
