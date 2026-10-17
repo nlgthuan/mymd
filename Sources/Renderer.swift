@@ -425,7 +425,9 @@ final class Renderer {
         }
 
         let ps = NSMutableParagraphStyle()
-        ps.lineHeightMultiple = 1.3
+        // Fixed extra leading, not lineHeightMultiple: a multiplier scales with the
+        // tallest thing on the line, so a large image would get a huge gap above it.
+        ps.lineSpacing = size * 0.38
         ps.paragraphSpacing = size * 0.8
         ps.headIndent = indent
         ps.firstLineHeadIndent = indent
@@ -436,6 +438,7 @@ final class Renderer {
         switch kind {
         case .header(let level)?:
             anchors[slug(content.string)] = out.length
+            ps.lineSpacing = 0
             ps.lineHeightMultiple = 1.1
             ps.paragraphSpacingBefore = out.length == 0 ? 0 : size * (level <= 2 ? 1.3 : 0.9)
             ps.paragraphSpacing = size * (level <= 2 ? 0.7 : 0.45)
@@ -458,7 +461,7 @@ final class Renderer {
             if tex.hasSuffix("\n") { tex.removeLast() }
             body = NSMutableAttributedString(attributedString: math(tex, display: true))
             ps.alignment = .center
-            ps.lineHeightMultiple = 1
+            ps.lineSpacing = 0
             ps.paragraphSpacingBefore = size * 0.2
             ps.paragraphSpacing = size
             align = true
@@ -475,6 +478,7 @@ final class Renderer {
             b.setWidth(size, type: .absoluteValueType, for: .padding, edge: .maxX)
             if indent > 0 { b.setWidth(indent, type: .absoluteValueType, for: .margin, edge: .minX) }
             blocks.append(b)
+            ps.lineSpacing = 0
             ps.lineHeightMultiple = 1.15
             ps.paragraphSpacing = 0
             ps.headIndent = 0
@@ -488,7 +492,7 @@ final class Renderer {
             b.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
             b.setBorderColor(Palette.rule, for: .maxY)
             blocks.append(b)
-            ps.lineHeightMultiple = 1
+            ps.lineSpacing = 0
             ps.paragraphSpacingBefore = size * 0.6
             ps.paragraphSpacing = size * 1.4
         case nil:
@@ -565,7 +569,7 @@ final class Renderer {
         }
         let ps = NSMutableParagraphStyle()
         ps.alignment = col < t.aligns.count ? t.aligns[col] : .natural
-        ps.lineHeightMultiple = 1.15
+        ps.lineSpacing = size * 0.2
         ps.textBlocks = t.outer + [b]
         p.append(NSAttributedString(string: "\n", attributes: [.font: body]))
         p.addAttribute(.paragraphStyle, value: ps, range: NSRange(location: 0, length: p.length))
