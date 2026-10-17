@@ -3,6 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleExecutable</key><string>mymd</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
 	<key>CFBundleIdentifier</key><string>com.thuanngo.mymd</string>
 	<key>CFBundleName</key><string>mymd</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
