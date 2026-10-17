@@ -3,6 +3,7 @@ BIN    := $(APP)/Contents/MacOS/mymd
 SRC    := $(wildcard Sources/*.swift)
 ICNS   := build/AppIcon.icns
 PREFIX ?= /Applications
+BINDIR ?= $(HOME)/.local/bin
 
 all: $(APP)
 
@@ -21,6 +22,8 @@ $(ICNS): tools/make-icon.swift
 install: $(APP)
 	rm -rf $(PREFIX)/mymd.app
 	cp -R $(APP) $(PREFIX)/
+	@mkdir -p $(BINDIR)
+	install -m 755 bin/mymd $(BINDIR)/mymd
 
 clean:
 	rm -rf build

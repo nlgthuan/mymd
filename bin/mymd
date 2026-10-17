@@ -1,0 +1,14 @@
+#!/bin/sh
+# mymd [file ...] — open markdown files in mymd.app (reuses the running instance).
+set -e
+n=$#
+while [ "$n" -gt 0 ]; do
+    f=$1; shift; n=$((n - 1))
+    case $f in
+        -h|--help) echo "usage: mymd [file ...]"; exit 0 ;;
+    esac
+    [ -f "$f" ] || { echo "mymd: $f: no such file" >&2; exit 1; }
+    case $f in /*) ;; *) f=$PWD/$f ;; esac
+    set -- "$@" "$f"
+done
+exec open -b com.thuanngo.mymd "$@"

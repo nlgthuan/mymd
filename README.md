@@ -6,11 +6,15 @@ title bar, no web view. Plain AppKit + TextKit, zero dependencies, ~1k lines of 
 ## Build
 
     make            # -> build/mymd.app
-    make install    # copies to /Applications (PREFIX=~/Applications to change)
+    make install    # app -> /Applications, `mymd` command -> ~/.local/bin
+                    # (override with PREFIX=... BINDIR=...)
 
-Open files with `open -a mymd file.md`, Finder's "Open With", or run the binary
-directly: `build/mymd.app/Contents/MacOS/mymd file.md`.
-Handy shell alias: `alias md='open -a mymd'`.
+Then from a terminal:
+
+    mymd README.md            # opens in the running instance if there is one
+    mymd docs/*.md            # one window per file
+
+Finder's "Open With" and `open -a mymd file.md` work too.
 
 ## Keys
 
