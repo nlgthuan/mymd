@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // MYMD_SNAPSHOT_SIZE=WxH and MYMD_SNAPSHOT_FULL=1 for the whole document.
         let env = ProcessInfo.processInfo.environment
         if let snap = env["MYMD_SNAPSHOT"], let v = viewers.first {
+            v.window.setFrameAutosaveName("")   // don't persist the snapshot's window size
             if let dims = env["MYMD_SNAPSHOT_SIZE"]?.split(separator: "x").compactMap({ Double($0) }), dims.count == 2 {
                 v.window.setContentSize(NSSize(width: dims[0], height: dims[1]))
             }
