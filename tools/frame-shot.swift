@@ -10,22 +10,24 @@ guard args.count == 3, let doc = CGPDFDocument(URL(fileURLWithPath: args[1]) as 
 }
 
 let scale: CGFloat = 2
-let margin: CGFloat = 48      // room for the shadow
+// Just enough room for the shadow, which falls downward: tight at the top so the
+// image doesn't leave a big gap under the text above it in the README.
+let pad = (top: CGFloat(6), side: CGFloat(20), bottom: CGFloat(30))
 let radius: CGFloat = 12
 let box = page.getBoxRect(.mediaBox)
-let size = CGSize(width: box.width + 2 * margin, height: box.height + 2 * margin)
+let size = CGSize(width: box.width + 2 * pad.side, height: box.height + pad.top + pad.bottom)
 
 let ctx = CGContext(data: nil, width: Int(size.width * scale), height: Int(size.height * scale),
                     bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
 ctx.scaleBy(x: scale, y: scale)
 
-let frame = CGRect(x: margin, y: margin, width: box.width, height: box.height)
+let frame = CGRect(x: pad.side, y: pad.bottom, width: box.width, height: box.height)
 let shape = CGPath(roundedRect: frame, cornerWidth: radius, cornerHeight: radius, transform: nil)
 
 // Shadow: draw the window shape once with a soft, slightly offset shadow.
 ctx.saveGState()
-ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 36, color: CGColor(gray: 0, alpha: 0.32))
+ctx.setShadow(offset: CGSize(width: 0, height: -8), blur: 20, color: CGColor(gray: 0, alpha: 0.3))
 ctx.addPath(shape)
 ctx.setFillColor(CGColor(gray: 0.5, alpha: 1))
 ctx.fillPath()
@@ -35,7 +37,7 @@ ctx.restoreGState()
 ctx.saveGState()
 ctx.addPath(shape)
 ctx.clip()
-ctx.translateBy(x: margin - box.minX, y: margin - box.minY)
+ctx.translateBy(x: pad.side - box.minX, y: pad.bottom - box.minY)
 ctx.drawPDFPage(page)
 ctx.restoreGState()
 
