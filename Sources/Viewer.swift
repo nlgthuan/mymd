@@ -17,6 +17,10 @@ final class MDTextView: NSTextView {
 /// Lays out the scroll view above a one-line bar (status / input), zathura style.
 final class Container: NSView {
     var onLayout: (() -> Void)?
+    override func draw(_ r: NSRect) {
+        Palette.bg.setFill()
+        r.fill()
+    }
     override func layout() {
         super.layout()
         onLayout?()
@@ -675,8 +679,10 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
 
     func windowDidResize(_ n: Notification) { updateStatus() }
 
-    func snapshot(to path: String) {
-        let pdf = text.dataWithPDF(inside: text.bounds)
+    /// Debug/README hook: writes a vector PDF of the window (or, with `full`, the
+    /// whole document) so renders can be checked without screen-recording rights.
+    func snapshot(to path: String, full: Bool) {
+        let pdf = full ? text.dataWithPDF(inside: text.bounds) : container.dataWithPDF(inside: container.bounds)
         try? pdf.write(to: URL(fileURLWithPath: path))
     }
 

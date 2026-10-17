@@ -41,3 +41,16 @@ clean:
 	rm -rf build
 
 .PHONY: all install clean
+
+# README screenshots: render docs/showcase.md in both themes and frame them.
+SHOT_SIZE := 820x660
+screenshots: $(APP)
+	@mkdir -p build/shots
+	@for theme in light dark; do \
+		MYMD_APPEARANCE=$$theme MYMD_SNAPSHOT_SIZE=$(SHOT_SIZE) MYMD_SNAPSHOT=$(CURDIR)/build/shots/$$theme.pdf \
+			$(BIN) docs/showcase.md && \
+		swift tools/frame-shot.swift build/shots/$$theme.pdf docs/screenshots/$$theme.png && \
+		echo "docs/screenshots/$$theme.png"; \
+	done
+
+.PHONY: screenshots

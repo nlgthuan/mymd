@@ -4,7 +4,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var viewers: [Viewer] = []
 
     func applicationWillFinishLaunching(_ n: Notification) {
-        if let a = UserDefaults.standard.string(forKey: "appearance") {
+        if let a = ProcessInfo.processInfo.environment["MYMD_APPEARANCE"] {
+            NSApp.appearance = NSAppearance(named: a == "dark" ? .darkAqua : .aqua)
+        } else if let a = UserDefaults.standard.string(forKey: "appearance") {
             NSApp.appearance = NSAppearance(named: NSAppearance.Name(a))
         }
         buildMenu()
@@ -16,9 +18,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.activate(ignoringOtherApps: true)
         if viewers.isEmpty { openDocument(nil) }
 
-        if let snap = ProcessInfo.processInfo.environment["MYMD_SNAPSHOT"], let v = viewers.first {
+        // Snapshot mode (see `make screenshots`): MYMD_SNAPSHOT=out.pdf, optional
+        // MYMD_SNAPSHOT_SIZE=WxH and MYMD_SNAPSHOT_FULL=1 for the whole document.
+        let env = ProcessInfo.processInfo.environment
+        if let snap = env["MYMD_SNAPSHOT"], let v = viewers.first {
+            if let dims = env["MYMD_SNAPSHOT_SIZE"]?.split(separator: "x").compactMap({ Double($0) }), dims.count == 2 {
+                v.window.setContentSize(NSSize(width: dims[0], height: dims[1]))
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                v.snapshot(to: snap)
+                v.snapshot(to: snap, full: env["MYMD_SNAPSHOT_FULL"] != nil)
                 NSApp.terminate(nil)
             }
         }

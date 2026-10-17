@@ -1,13 +1,20 @@
 # mymd
 
 A minimal, native macOS markdown viewer in the spirit of zathura: no toolbar, no
-title bar, no web view. Plain AppKit + TextKit, zero dependencies, ~1k lines of Swift.
+title bar, no web view. Plain AppKit + TextKit, ~2k lines of Swift, one vendored
+library (SwiftMath, for TeX).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark.png">
+  <img alt="mymd showing headings, inline and display math, a highlighted code block, a table and a task list" src="docs/screenshots/light.png" width="720">
+</picture>
 
 ## Build
 
     make            # -> build/mymd.app
     make install    # app -> /Applications, `mymd` command -> ~/.local/bin
                     # (override with PREFIX=... BINDIR=...)
+    make screenshots  # regenerate docs/screenshots from docs/showcase.md
 
 Then from a terminal:
 
