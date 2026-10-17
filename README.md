@@ -25,6 +25,8 @@ Finder's "Open With" and `open -a mymd file.md` work too.
 
 ## Keys
 
+In the app, **Help → Keyboard Shortcuts** (`⌘?`) shows the full list.
+
 | key                         | action                         |
 |-----------------------------|--------------------------------|
 | `j` `k` / arrows            | scroll                         |

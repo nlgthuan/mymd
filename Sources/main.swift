@@ -106,6 +106,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func clearRecent(_ sender: Any?) { NSDocumentController.shared.clearRecentDocuments(sender) }
 
+    @objc func showHelp(_ sender: Any?) {
+        guard let url = Bundle.main.url(forResource: "shortcuts", withExtension: "md") else { return NSSound.beep() }
+        open(url)
+    }
+
     @objc func closeWindow(_ sender: Any?) { NSApp.keyWindow?.close() }
     @objc func reload(_ sender: Any?) { active?.reload() }
     @objc func find(_ sender: Any?) { active?.beginSearch() }
@@ -151,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                       ("Toggle Dark Mode", #selector(toggleDark(_:)), "d", [.command, .shift]),
                       ("Toggle Status Bar", #selector(toggleBar(_:)), "b", [.command, .shift])])
         menu("Window", [("Minimize", #selector(NSWindow.miniaturize(_:)), "m", .command)])
+        NSApp.helpMenu = menu("Help", [("Keyboard Shortcuts", #selector(showHelp(_:)), "?", .command)])
         NSApp.mainMenu = main
     }
 }

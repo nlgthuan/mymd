@@ -192,6 +192,12 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
 
     // MARK: loading
 
+    /// The built-in help page lives in the app bundle: keep it out of recents and
+    /// don't show its long bundle path in the status bar.
+    private var isBundled: Bool {
+        url.path.hasPrefix(Bundle.main.bundlePath + "/")
+    }
+
     func load(_ u: URL, keepY: CGFloat? = nil) {
         guard let data = try? Data(contentsOf: u) else {
             flash("cannot read \(u.path)", error: true)
@@ -201,7 +207,7 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
         if u != url { watcher?.cancel(); watcher = nil }
         url = u
         lastSource = src
-        NSDocumentController.shared.noteNewRecentDocumentURL(u)
+        if !isBundled { NSDocumentController.shared.noteNewRecentDocumentURL(u) }
         window.title = u.lastPathComponent
         window.representedURL = u
         render(src, keepY: keepY)
@@ -551,7 +557,7 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
 
     private func updateStatus() {
         guard !inputActive else { return }
-        left.stringValue = (url.path as NSString).abbreviatingWithTildeInPath
+        left.stringValue = isBundled ? "mymd help" : (url.path as NSString).abbreviatingWithTildeInPath
         left.textColor = Palette.muted
         let y = scroll.contentView.bounds.minY
         let m = maxY

@@ -11,10 +11,11 @@ MATH_LIB := build/math/libSwiftMath.a
 
 all: $(APP)
 
-$(APP): $(SRC) $(MATH_LIB) Info.plist $(ICNS) $(wildcard Vendor/SwiftMath/mathFonts.bundle/*)
+$(APP): $(SRC) $(MATH_LIB) Info.plist $(ICNS) Resources/shortcuts.md $(wildcard Vendor/SwiftMath/mathFonts.bundle/*)
 	@mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp Info.plist $(APP)/Contents/Info.plist
 	cp $(ICNS) $(APP)/Contents/Resources/AppIcon.icns
+	cp Resources/shortcuts.md $(APP)/Contents/Resources/
 	rm -rf $(APP)/Contents/Resources/mathFonts.bundle
 	cp -R Vendor/SwiftMath/mathFonts.bundle $(APP)/Contents/Resources/
 	swiftc -O -swift-version 5 -target $(TARGET) -I build/math -L build/math -lSwiftMath $(SRC) -o $(BIN)
