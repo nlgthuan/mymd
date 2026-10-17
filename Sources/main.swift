@@ -1,6 +1,6 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var viewers: [Viewer] = []
 
     func applicationWillFinishLaunching(_ n: Notification) {
@@ -63,6 +63,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if viewers.isEmpty { NSApp.terminate(nil) }
     }
 
+    // MARK: open recent (backed by NSDocumentController, which also feeds the Dock menu)
+
+    private let recentMenu = NSMenu(title: "Open Recent")
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === recentMenu else { return }
+        menu.removeAllItems()
+        let urls = NSDocumentController.shared.recentDocumentURLs
+        let names = urls.map { FileManager.default.displayName(atPath: $0.path) }
+        for (url, name) in zip(urls, names) {
+            // Disambiguate same-named files (README.md) with their folder, like Finder.
+            let dup = names.filter { $0 == name }.count > 1
+            let title = dup ? "\(name) — \(url.deletingLastPathComponent().lastPathComponent)" : name
+            let item = menu.addItem(withTitle: title, action: #selector(openRecent(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = url
+            item.toolTip = (url.path as NSString).abbreviatingWithTildeInPath
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            icon.size = NSSize(width: 16, height: 16)
+            item.image = icon
+        }
+        if !urls.isEmpty { menu.addItem(.separator()) }
+        let clear = menu.addItem(withTitle: "Clear Menu", action: #selector(clearRecent(_:)), keyEquivalent: "")
+        clear.target = self
+        clear.isEnabled = !urls.isEmpty
+    }
+
+    @objc func openRecent(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        if FileManager.default.isReadableFile(atPath: url.path) { open(url) } else { NSSound.beep() }
+    }
+
+    @objc func clearRecent(_ sender: Any?) { NSDocumentController.shared.clearRecentDocuments(sender) }
+
     @objc func closeWindow(_ sender: Any?) { NSApp.keyWindow?.close() }
     @objc func reload(_ sender: Any?) { active?.reload() }
     @objc func find(_ sender: Any?) { active?.beginSearch() }
@@ -74,7 +108,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() {
         let main = NSMenu()
-        func menu(_ title: String, _ items: [(String, Selector?, String, NSEvent.ModifierFlags)]) {
+        @discardableResult
+        func menu(_ title: String, _ items: [(String, Selector?, String, NSEvent.ModifierFlags)]) -> NSMenu {
             let item = NSMenuItem()
             let m = NSMenu(title: title)
             for (t, sel, key, mods) in items {
@@ -84,13 +119,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             item.submenu = m
             main.addItem(item)
+            return m
         }
         menu("mymd", [("Hide mymd", #selector(NSApplication.hide(_:)), "h", .command),
                       ("-", nil, "", []),
                       ("Quit mymd", #selector(NSApplication.terminate(_:)), "q", .command)])
-        menu("File", [("Open…", #selector(openDocument(_:)), "o", .command),
+        let file = menu("File", [("Open…", #selector(openDocument(_:)), "o", .command),
                       ("Reload", #selector(reload(_:)), "r", .command),
                       ("Close", #selector(closeWindow(_:)), "w", .command)])
+        let recent = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
+        recentMenu.delegate = self
+        recentMenu.autoenablesItems = false
+        recent.submenu = recentMenu
+        file.insertItem(recent, at: 1)
         menu("Edit", [("Copy", #selector(NSText.copy(_:)), "c", .command),
                       ("Select All", #selector(NSText.selectAll(_:)), "a", .command),
                       ("Find", #selector(find(_:)), "f", .command)])

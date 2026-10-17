@@ -194,6 +194,7 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
         if u != url { watcher?.cancel(); watcher = nil }
         url = u
         lastSource = src
+        NSDocumentController.shared.noteNewRecentDocumentURL(u)
         window.title = u.lastPathComponent
         window.representedURL = u
         render(src, keepY: keepY)
