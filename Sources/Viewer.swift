@@ -233,9 +233,9 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
         updateStatus()
     }
 
-    /// Math is rasterised in the current text colour, so re-render on theme change.
+    /// Math and task boxes are drawn in theme colours, so re-render on theme change.
     func appearanceChanged() {
-        guard let src = lastSource, src.contains("$") || src.contains("\\(") || src.contains("```math") else { return }
+        guard let src = lastSource, src.contains("$") || src.contains("\\(") || src.contains("```math") || src.contains("] ") else { return }
         render(src, keepY: scroll.contentView.bounds.minY)
     }
 

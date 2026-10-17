@@ -505,18 +505,22 @@ final class Renderer {
         var prefix: NSAttributedString?
         if let item, !seenItems.contains(item.id) {
             seenItems.insert(item.id)
-            var marker = item.ordered ? "\(item.ordinal)." : ["•", "◦", "▪"][(max(totalLists, 1) - 1) % 3]
+            let marker = item.ordered ? "\(item.ordinal)." : ["•", "◦", "▪"][(max(totalLists, 1) - 1) % 3]
+            var task: Bool?
             let s = body.string
             if s.hasPrefix("[ ] ") || s.hasPrefix("[x] ") || s.hasPrefix("[X] ") {
-                marker = s.hasPrefix("[ ]") ? "☐" : "☑"
+                task = !s.hasPrefix("[ ]")
                 body.deleteCharacters(in: NSRange(location: 0, length: 4))
             }
             if innerLists > 0, !isCode {
                 ps.firstLineHeadIndent = indent - step
                 ps.tabStops = [NSTextTab(textAlignment: .right, location: indent - step * 0.35),
                                NSTextTab(textAlignment: .left, location: indent)]
-                let color = item.ordered ? Palette.text : Palette.muted
-                prefix = NSAttributedString(string: "\t\(marker)\t", attributes: [.font: self.body, .foregroundColor: color])
+                let attrs: [NSAttributedString.Key: Any] = [.font: self.body, .foregroundColor: item.ordered ? Palette.text : Palette.muted]
+                let p = NSMutableAttributedString(string: "\t", attributes: attrs)
+                p.append(task.map(checkbox) ?? NSAttributedString(string: marker, attributes: attrs))
+                p.append(NSAttributedString(string: "\t", attributes: attrs))
+                prefix = p
             }
         }
 
@@ -549,6 +553,42 @@ final class Renderer {
         ps.minimumLineHeight = size * 0.8
         ps.maximumLineHeight = size * 0.8
         out.append(NSAttributedString(string: "\n", attributes: [.font: NSFont.systemFont(ofSize: 1), .paragraphStyle: ps]))
+    }
+
+    /// Task-list box, drawn rather than using ☐/☑, whose glyphs differ in size
+    /// between fonts. Colours are baked per theme (the view re-renders on change).
+    private func checkbox(_ checked: Bool) -> NSAttributedString {
+        let side = round(size * 0.86)
+        let accent = dark ? Palette.rgb(110, 165, 255) : Palette.rgb(10, 95, 200)
+        let outline = dark ? Palette.rgb(120, 120, 126) : Palette.rgb(150, 150, 156)
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { r in
+            let box = NSBezierPath(roundedRect: r.insetBy(dx: 0.75, dy: 0.75), xRadius: side * 0.22, yRadius: side * 0.22)
+            if checked {
+                accent.setFill()
+                box.fill()
+                let tick = NSBezierPath()
+                tick.move(to: NSPoint(x: side * 0.26, y: side * 0.52))
+                tick.line(to: NSPoint(x: side * 0.43, y: side * 0.34))
+                tick.line(to: NSPoint(x: side * 0.75, y: side * 0.68))
+                tick.lineWidth = max(1.5, side * 0.13)
+                tick.lineCapStyle = .round
+                tick.lineJoinStyle = .round
+                NSColor.white.setStroke()
+                tick.stroke()
+            } else {
+                box.lineWidth = 1.2
+                outline.setStroke()
+                box.stroke()
+            }
+            return true
+        }
+        let att = NSTextAttachment()
+        att.image = image
+        // Centre the box on the cap height so it lines up with the item's text.
+        att.bounds = CGRect(x: 0, y: round((body.capHeight - side) / 2), width: side, height: side)
+        let s = NSMutableAttributedString(attachment: att)
+        s.addAttribute(.font, value: body, range: NSRange(location: 0, length: s.length))
+        return s
     }
 
     private func emitCell(_ content: NSMutableAttributedString, _ col: Int) {
