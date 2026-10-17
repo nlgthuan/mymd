@@ -155,9 +155,12 @@ final class Viewer: NSObject, NSWindowDelegate, NSTextViewDelegate, NSTextFieldD
         bar.isHidden = barH == 0
         bar.frame = NSRect(x: 0, y: 0, width: b.width, height: barH)
         scroll.frame = NSRect(x: 0, y: barH, width: b.width, height: b.height - barH)
-        let cw = scroll.contentSize.width
-        if text.frame.width != cw {
-            text.setFrameSize(NSSize(width: cw, height: max(text.frame.height, scroll.contentSize.height)))
+        // Keep the text view exactly as wide as the viewport and at least as tall;
+        // a stale taller frame would leave phantom scroll room after a resize.
+        let viewport = scroll.contentSize
+        if text.frame.width != viewport.width || text.minSize.height != viewport.height {
+            text.minSize = NSSize(width: 0, height: viewport.height)
+            text.setFrameSize(NSSize(width: viewport.width, height: text.frame.height))
             text.sizeToFit()
         }
         let pad: CGFloat = 10

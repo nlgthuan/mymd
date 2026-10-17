@@ -401,7 +401,6 @@ final class Renderer {
                 t.layoutAlgorithm = .automaticLayoutAlgorithm
                 t.collapsesBorders = true
                 t.hidesEmptyCells = false
-                t.setWidth(size * 0.9, type: .absoluteValueType, for: .margin, edge: .maxY)
                 if indent > 0 { t.setWidth(indent, type: .absoluteValueType, for: .margin, edge: .minX) }
                 let aligns: [NSTextAlignment] = tc.cols.map {
                     switch $0.alignment {
@@ -580,8 +579,9 @@ final class Renderer {
     }
 
     private func finishTable() {
-        guard table != nil else { return }
+        guard let t = table else { return }
         fillRow()
+        spacer(t.outer)   // table margins aren't honoured either (see spacer)
         table = nil
         prevInList = false
     }
